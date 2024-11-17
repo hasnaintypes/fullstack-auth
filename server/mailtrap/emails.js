@@ -6,6 +6,12 @@ import {
 } from "./emailTemplates.js";
 import { mailtrapClient, sender } from "./mailtrapConfig.js";
 
+// Send verification email function:
+// This function handles the process of sending verification email by performing the following actions:
+// 1. Generate a verification token
+// 2. Send the verification email to the user's email address
+// 3. Log the response if the email is sent successfully
+// 4. Handle any errors that occur during the process
 export const sendVerificationEmail = async (email, verificationToken) => {
   const recipient = [{ email }];
 
@@ -28,6 +34,11 @@ export const sendVerificationEmail = async (email, verificationToken) => {
   }
 };
 
+// Send welcome email function:
+// This function handles the process of sending welcome email by performing the following actions:
+// 1. Send the welcome email to the user's email address
+// 2. Log the response if the email is sent successfully
+// 3. Handle any errors that occur during the process
 export const sendWelcomeEmail = async (email, name) => {
   const recipient = [{ email }];
 
@@ -48,6 +59,11 @@ export const sendWelcomeEmail = async (email, name) => {
   }
 };
 
+// Send password reset email function:
+// This function handles the process of sending password reset email by performing the following actions:
+// 1. Send the password reset email to the user's email address
+// 2. Log the response if the email is sent successfully
+// 3. Handle any errors that occur during the process
 export const sendPasswordResetEmail = async (email, resetURL) => {
   const recipient = [{ email }];
 
@@ -66,7 +82,12 @@ export const sendPasswordResetEmail = async (email, resetURL) => {
   }
 };
 
-export const sendResetSuccessEmail = async (email) => {
+// Send password reset success email function:
+// This function handles the process of sending password reset success email by performing the following actions:
+// 1. Send the password reset success email to the user's email address
+// 2. Log the response if the email is sent successfully
+// 3. Handle any errors that occur during the process
+export const sendResetSuccessEmail = async (email, name) => {
   const recipient = [{ email }];
 
   try {
@@ -74,7 +95,7 @@ export const sendResetSuccessEmail = async (email) => {
       from: sender,
       to: recipient,
       subject: "Password Reset Successful",
-      html: PASSWORD_RESET_SUCCESS_TEMPLATE,
+      html: PASSWORD_RESET_SUCCESS_TEMPLATE.replace("{userName}", name),
       category: "Password Reset",
     });
 

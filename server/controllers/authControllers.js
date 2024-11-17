@@ -1,7 +1,13 @@
 import { User } from "../models/userModel.js";
 import bcryptjs from "bcryptjs";
 import { generateTokenAndSetCookie } from "../utils/generateTokenAndSetCookie.js";
-import { sendVerificationEmail, sendWelcomeEmail } from "../mailtrap/emails.js";
+import {
+  sendVerificationEmail,
+  sendWelcomeEmail,
+  sendPasswordResetEmail,
+  sendResetSuccessEmail,
+} from "../mailtrap/emails.js";
+import crypto from "crypto";
 
 // signUp Function:
 // This function handles user registration by performing the following actions:
@@ -13,6 +19,7 @@ import { sendVerificationEmail, sendWelcomeEmail } from "../mailtrap/emails.js";
 // - Saving the user data (including the hashed password and verification token) to the database.
 // - Generating and sending a JWT token to the client to authenticate the user immediately.
 // - Returning a success response containing the user data, excluding sensitive information like the password.
+// - Sending a failure response if any errors occur during the registration process.
 export const signUp = async (req, res) => {
   const { email, name, password } = req.body;
 
@@ -48,7 +55,7 @@ export const signUp = async (req, res) => {
       password: hashedPassword,
       name,
       verificationToken,
-      verificationTokenExpiresAt: Date.now() + 24 * 60 * 60 * 1000, // Token expires in 24 hours
+      verificationTokenExpires: Date.now() + 10 * 60 * 1000, // Token expires in 24 hours
     });
 
     // Save the new user to the database
@@ -82,21 +89,19 @@ export const signUp = async (req, res) => {
 
 // verifyEmail Function:
 // This function handles verifying a user's email address by performing the following actions:
-// 1. Retrieves the user from the database based on the provided verification token.
-// 2. Checks if the verification token is valid and has not expired.
-// 3. If the token is valid, updates the user's verified status to true and saves the changes to the database.
-// 4. Sends a welcome email to the user after successful verification.
-// 5. Returns a success response with the user data, excluding sensitive information like the password.
+// - Finding the user based on the provided verification code and ensuring it has not expired.
+// - Marking the user as verified and removing the verification token fields from the database.
+// - Sending a welcome email to the user after successful verification.
+// - Returning a success response with the user data, excluding sensitive information like the password.
+// - Sending a failure response if the verification code is invalid or expired.
 export const verifyEmail = async (req, res) => {
   const { code } = req.body;
   try {
-    console.log("Verification code received: ", code);
-
     // Find user with matching verificationToken and non-expired verificationTokenExpires
     const user = await User.findOne({
-      verificationToken: code,
+      verificationToken: code.trim(), // Sanitize the code input
+      verificationTokenExpires: { $gt: Date.now() }, // Correct field name
     });
-    console.log("User query result: ", user);
 
     if (!user) {
       return res.status(400).json({
@@ -139,6 +144,7 @@ export const verifyEmail = async (req, res) => {
 // - Generating and sending a JWT token to the client if the login is successful.
 // - Updating the user's last login timestamp and saving the changes to the database.
 // - Returning a success response with the user's data, excluding sensitive information like the password.
+// - Sending a failure response if the user is not found or the password is incorrect.
 export const signIn = async (req, res) => {
   const { email, password } = req.body;
 
@@ -192,6 +198,7 @@ export const signIn = async (req, res) => {
 // This function handles logging out a user by performing the following actions:
 // - Clearing the authentication token stored in the cookies, effectively logging the user out.
 // - Sending a success response with a message indicating the user has been logged out successfully.
+// - Sending a failure response if any errors occur during the logout process.
 export const logOut = async (req, res) => {
   try {
     // Clear the token cookie to log the user out
@@ -207,5 +214,125 @@ export const logOut = async (req, res) => {
       message: "Internal server error",
       error: error.message,
     });
+  }
+};
+
+// forgotPassword Function:
+// This function handles the process of resetting a user's password by performing the following actions:
+// - Sending a verification email to the user's email address with a password reset link.
+// - Updating the user's password reset token and expiration time in the database.
+// - Returning a success response with a message indicating that the password reset link has been sent.
+// - Sending a failure response if the user is not found in the database.
+export const forgotPassword = async (req, res) => {
+  // get user based on email
+  const { email } = req.body;
+  try {
+    // find user with matching email
+    const user = await User.findOne({ email });
+    // if no user, return error
+    if (!user) {
+      return res
+        .status(400)
+        .json({ success: false, message: "User not found" });
+    }
+
+    // generate reset token
+    const resetToken = crypto.randomBytes(20).toString("hex");
+    // set reset token expiry
+    const resetTokenExpiresAt = Date.now() + 1 * 60 * 60 * 1000; // 1 hour
+
+    // update user with reset token and expiry
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpires = resetTokenExpiresAt;
+
+    // save user to database
+    await user.save();
+
+    // send email with reset token
+    await sendPasswordResetEmail(
+      user.email,
+      `${process.env.CLIENT_URL}/reset-password/${resetToken}`
+    );
+
+    // return success response
+    res.status(200).json({
+      success: true,
+      message: "Password reset link sent to your email",
+    });
+  } catch (error) {
+    // return error response
+    console.log("Error in forgotPassword ", error);
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+// resetPassword Function:
+// This function handles the process of resetting a user's password by performing the following actions:
+// - Retrieving the user based on the provided password reset token and ensuring it has not expired.
+// - Hashing the new password securely before updating the user's password in the database.
+// - Sending a success email to the user after the password has been reset.
+// - Returning a success response with a message indicating that the password has been reset successfully.
+// - Sending a failure response if the password reset token is invalid or expired.
+export const resetPassword = async (req, res) => {
+  try {
+    // get user based on token
+    const { token } = req.params;
+    const { password } = req.body;
+
+    // find user with matching resetPasswordToken and non-expired resetPasswordExpires
+    const user = await User.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: Date.now() },
+    });
+
+    // if no user, return error
+    if (!user) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid or expired reset token" });
+    }
+
+    // hash the new password
+    const hashedPassword = await bcryptjs.hash(password, 10);
+    // update user password and reset token fields
+    user.password = hashedPassword;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    // save user
+    await user.save();
+    // send email
+    await sendResetSuccessEmail(user.email, user.name);
+    // return success response
+    res
+      .status(200)
+      .json({ success: true, message: "Password reset successful" });
+  } catch (error) {
+    // Log the error and send a failure response
+    console.log("Error in resetPassword ", error);
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+// checkAuth Function:
+// This function handles checking the authentication status of a user by performing the following actions:
+// - Retrieving the user data based on the user ID extracted from the JWT token.
+// - Sending a success response with the user data, excluding sensitive information like the password.
+// - Sending a failure response if the user is not found in the database.
+export const checkAuth = async (req, res) => {
+  try {
+    // Find the user by ID and exclude the password field
+    const user = await User.findById(req.userId).select("-password");
+    // If the user is not found, send a failure response
+    if (!user) {
+      return res
+        .status(400)
+        .json({ success: false, message: "User not found" });
+    }
+    // Send a success response with the user data
+    res.status(200).json({ success: true, user });
+  } catch (error) {
+    // Log the error and send a failure response
+    console.log("Error in checkAuth ", error);
+    res.status(400).json({ success: false, message: error.message });
   }
 };

@@ -1,5 +1,10 @@
 import jwt from "jsonwebtoken";
 
+// Middleware to verify token
+// If token is valid, it decodes the token and adds the userId to the request object
+// If token is invalid, it returns 401 status code
+// If token is not provided, it returns 401 status code
+// If there is any error, it returns 500 status code
 export const verifyToken = (req, res, next) => {
   const token = req.cookies.token;
   if (!token)
