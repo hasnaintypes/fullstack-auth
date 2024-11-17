@@ -1,7 +1,7 @@
 import { User } from "../models/userModel.js";
 import bcryptjs from "bcryptjs";
 import { generateTokenAndSetCookie } from "../utils/generateTokenAndSetCookie.js";
-import { sendVerificationEmail } from "../mailtrap/emails.js";
+import { sendVerificationEmail, sendWelcomeEmail } from "../mailtrap/emails.js";
 
 // signUp Function:
 // This function handles user registration by performing the following actions:
@@ -77,6 +77,57 @@ export const signUp = async (req, res) => {
       message: "Internal server error",
       error: error.message,
     });
+  }
+};
+
+// verifyEmail Function:
+// This function handles verifying a user's email address by performing the following actions:
+// 1. Retrieves the user from the database based on the provided verification token.
+// 2. Checks if the verification token is valid and has not expired.
+// 3. If the token is valid, updates the user's verified status to true and saves the changes to the database.
+// 4. Sends a welcome email to the user after successful verification.
+// 5. Returns a success response with the user data, excluding sensitive information like the password.
+export const verifyEmail = async (req, res) => {
+  const { code } = req.body;
+  try {
+    console.log("Verification code received: ", code);
+
+    // Find user with matching verificationToken and non-expired verificationTokenExpires
+    const user = await User.findOne({
+      verificationToken: code,
+    });
+    console.log("User query result: ", user);
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired verification code",
+      });
+    }
+
+    // Mark user as verified and remove token fields
+    user.isVerified = true;
+    user.verificationToken = undefined;
+    user.verificationTokenExpires = undefined;
+    await user.save();
+
+    console.log("User verified successfully:", user);
+
+    // Send welcome email
+    await sendWelcomeEmail(user.email, user.name);
+
+    // Respond with success
+    res.status(200).json({
+      success: true,
+      message: "Email verified successfully",
+      user: {
+        ...user._doc,
+        password: undefined, // Exclude password from response
+      },
+    });
+  } catch (error) {
+    console.error("Error in verifyEmail:", error);
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
