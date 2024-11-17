@@ -1,0 +1,36 @@
+# Node.js dependencies
+/node_modules/
+
+# Environment variables file
+.env
+
+# Logs
+logs
+*.log
+*.log.*
+
+# Temporary files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Directory for cache
+/.cache
+
+# Build output directory
+/dist
+/build
+
+# IDE/editor files
+.vscode/
+.idea/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Jest coverage reports (if using Jest for testing)
+coverage/
+
+# Optional: If you're using PM2 or other process managers for production environments
+pm2/logs
