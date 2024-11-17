@@ -1,6 +1,7 @@
 import { User } from "../models/userModel.js";
 import bcryptjs from "bcryptjs";
 import { generateTokenAndSetCookie } from "../utils/generateTokenAndSetCookie.js";
+import { sendVerificationEmail } from "../mailtrap/emails.js";
 
 // signUp Function:
 // This function handles user registration by performing the following actions:
@@ -8,6 +9,7 @@ import { generateTokenAndSetCookie } from "../utils/generateTokenAndSetCookie.js
 // - Checking if the user already exists in the database to prevent duplicate registrations.
 // - Hashing the password securely before storing it in the database.
 // - Generating a verification token and setting an expiration time for it.
+// - Sending a verification email to the user's email address.
 // - Saving the user data (including the hashed password and verification token) to the database.
 // - Generating and sending a JWT token to the client to authenticate the user immediately.
 // - Returning a success response containing the user data, excluding sensitive information like the password.
@@ -54,6 +56,9 @@ export const signUp = async (req, res) => {
 
     // Generate a JWT token and set it as a cookie for authentication
     generateTokenAndSetCookie(res, user._id);
+
+    // Send a verification email to the user with the verification token
+    await sendVerificationEmail(user.email, verificationToken);
 
     // Respond with a success message and the user data (excluding the password)
     res.status(201).json({
