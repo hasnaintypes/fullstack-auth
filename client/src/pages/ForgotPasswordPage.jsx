@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { useState } from "react";
+import { useAuthStore } from "../store/authStore";
 import Input from "../components/Input";
 import { ArrowLeft, Loader, Mail } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -8,9 +9,11 @@ const ForgotPasswordPage = () => {
   const [email, setEmail] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
 
+  const { isLoading, forgotPassword } = useAuthStore();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    await forgotPassword(email);
     setIsSubmitted(true);
   };
 
@@ -46,11 +49,11 @@ const ForgotPasswordPage = () => {
               className="w-full py-3 px-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold rounded-lg shadow-lg hover:from-green-600 hover:to-emerald-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-gray-900 transition duration-200"
               type="submit"
             >
-              {/* {isLoading ? (
+              {isLoading ? (
                 <Loader className="size-6 animate-spin mx-auto" />
               ) : (
                 "Send Reset Link"
-              )} */}
+              )}
             </motion.button>
           </form>
         ) : (
